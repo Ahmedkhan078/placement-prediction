@@ -1,65 +1,58 @@
-# train_model file
 import pandas as pd
-from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import LabelEncoder
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import accuracy_score
 import joblib
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import OrdinalEncoder
+from sklearn.impute import SimpleImputer
+from sklearn.ensemble import RandomForestClassifier
 
+# Load dataset
 df = pd.read_excel("AU_Student_Placement_Data.xlsx")
 
-
-df = df.rename(columns={
-    "SEX(M/F)": "Gender",
-    "Board of Xth ": "XthBoard",
-    "Board of XII": "XIIthBoard",
-    "BACKLOG": "Backlog",
-    "Btech": "Graduation",
-    "Training Status": "Training",
-    "Placement Status": "Placement",
-    "Campus Drive attended": "CampusDrive",
-    "Placement Year": "Year"
-})
-
-
+# Remove Salary column (not needed)
 df = df.drop(columns=["Salary"])
 
-df = df.dropna(subset=["Placement"])
+# Dataset column names (REAL from Excel)
+numeric_cols = [
+    "Xth", "XIIth", "BACKLOG", "Btech",
+    "Training Status", "Campus Drive attended",
+    "Placement Year"
+]
 
+categorical_cols = [
+    "SEX(M/F)", "Stream", "Board of Xth ",
+    "Board of XII", "Origin"
+]
 
-categorical_cols = ["Gender", "Stream", "XthBoard", "XIIthBoard", "Origin"]
-encoders = {}
+target_col = "Placement Status"
 
-for col in categorical_cols:
-    le = LabelEncoder()
-    df[col] = le.fit_transform(df[col].astype(str))
-    encoders[col] = le
+X = df[numeric_cols + categorical_cols]
+y = df[target_col]
 
+# Numeric imputer
+num_imp = SimpleImputer(strategy="median")
+X[numeric_cols] = num_imp.fit_transform(X[numeric_cols])
 
-X = df.drop(columns=["Placement"])
-y = df["Placement"]
+# Categorical encoder
+enc = OrdinalEncoder()
+X[categorical_cols] = enc.fit_transform(X[categorical_cols].astype(str))
 
-feature_names = X.columns.tolist()
-
+# Split
 X_train, X_test, y_train, y_test = train_test_split(
     X, y, test_size=0.2, random_state=42
 )
 
-
-model = RandomForestClassifier(random_state=42)
+# Model
+model = RandomForestClassifier(n_estimators=200, random_state=42)
 model.fit(X_train, y_train)
 
-
-y_pred = model.predict(X_test)
-acc = accuracy_score(y_test, y_pred)
-print(f"Validation Accuracy: {acc:.3f}")
-
-
+# Save everything
 bundle = {
     "model": model,
-    "encoders": encoders,
-    "feature_names": feature_names
+    "enc": enc,
+    "num_imp": num_imp,
+    "feature_names": X.columns.tolist()
 }
 
 joblib.dump(bundle, "placement_model.pkl")
-print("Saved trained model to placement_model.pkl")
+
+print("🎉 Model trained and saved successfully!")
